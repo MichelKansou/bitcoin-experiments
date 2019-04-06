@@ -31,3 +31,29 @@ class FieldElement:
             raise TypeError('Cannot sub two numbers in different fields')
         num = (self.num - other.num) % self.prime
         return self.__class__(num, self.prime)
+    
+    def __mul__(self, other):
+        if self.prime != other.prime:
+            raise TypeError('Cannot multiply two numbers in different Fields')
+        num = (self.num * other.num) % self.prime
+        return self.__class__(num, self.prime)
+    
+    def __pow__(self, exponent):
+        #n = exponent
+        #while n < 0:
+        #    n += self.prime - 1
+        n = exponent % (self.prime - 1)
+        num = pow(self.num, n, self.prime)
+        return self.__class__(num, self.prime)
+    
+    def __truediv__(self, other):
+        if self.prime != other.prime:
+            raise TypeError('Cannot divide two numbers in different Fields')
+        # use fermat's little theorem:
+        # self.num**(p-1) % p == 1
+                # this means:
+        # 1/n == pow(n, p-2, p)
+        # We return an element of the same class
+        other_result = pow(other.num, self.prime-2, self.prime)
+        num = (self.num * other_result) % self.prime
+        return self.__class__(num, self.prime)
