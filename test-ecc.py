@@ -1,4 +1,4 @@
-from ecc import FieldElement, Point, S256Point, G, N
+from ecc import FieldElement, Point, S256Point, G, N, PrivateKey
 from Crypto.Hash import SHA256
 from random import randint
 
@@ -81,24 +81,14 @@ print(R.x.num == r) # check if the x coordinate is r
 e = 12345
 message = SHA256.new(b'Programming Bitcoin!').digest()
 z = int.from_bytes(message, 'big')
-# choose a random k
-k = randint(1,12345)
-# calculate r (kG's x-coordinate)
-r = (k*G).x.num
-# calculate s ((z+re)/k)
-k_inv = pow(k, N-2, N)
-s = (z + r*e) * k_inv % N
-# print the point, z, r and s
-point = e*G
-print(point)
-print(hex(z))
-print(hex(r))
-print(hex(s))
+p_key = PrivateKey(e)
 
-# Verify Signature
-s_inv = pow(s, N-2, N)
-u = z*s_inv % N
-v = r*s_inv % N
-R = u*G + v*point
+signature = p_key.sign(z)
+print(signature)
 
-print(R.x.num == r) # check if the x coordinate is r
+s_inv = pow(signature.s, N-2, N)
+u = z * s_inv % N
+v = signature.r * s_inv % N
+R = u*G + v*p_key.point
+print(R.x.num)
+print(R.x.num == signature.r) # check if the x coordinate is r
