@@ -1,3 +1,5 @@
+from random import randint
+
 class FieldElement:
     
     def __init__(self, num, prime):
@@ -58,6 +60,10 @@ class FieldElement:
         num = (self.num * other_result) % self.prime
         return self.__class__(num, self.prime)
 
+    def __rmul__(self, coefficient):
+        num = (self.num * coefficient) % self.prime
+        return self.__class__(num=num, prime=self.prime)
+
 class Point:
 
     def __init__(self, x, y, a, b):
@@ -74,21 +80,25 @@ class Point:
         return self.x == other.x and self.y == other.y and self.a == other.a and self.b == other.b
     
     def __ne__(self, other):
-        return self.x != other.x or self.y != other.y or self.a != other.a or self.b != other.b
-    
+        # this should be the inverse of the == operator
+        return not (self == other)
+
     def __repr__(self):
         if self.x is None:
             return 'Point(infinity)'
+        elif isinstance(self.x, FieldElement):
+            return 'Point({},{})_{}_{} FieldElement({})'.format(
+                self.x.num, self.y.num, self.a.num, self.b.num, self.x.prime)
         else:
             return 'Point({},{})_{}_{}'.format(self.x, self.y, self.a, self.b)
 
     def __add__(self, other):
         if self.a != other.a or self.b != other.b:
-            raise TypeError('Points {}, {} are not on the same curve'.format
-            (self, other))
-
+            raise TypeError('Points {}, {} are not on the same curve'.format(self, other))
+        # Case 0.0: self is the point at infinity, return other
         if self.x is None:
             return other
+        # Case 0.1: other is the point at infinity, return self
         if other.x is None:
             return self
 
@@ -96,17 +106,24 @@ class Point:
         # Result is point at infinity
         if self.x == other.x and self.y != other.y:
             return self.__class__(None, None, self.a, self.b)
-        
+
         # Case 2: self.x ≠ other.x
         # Formula (x3,y3)==(x1,y1)+(x2,y2)
         # s=(y2-y1)/(x2-x1)
         # x3=s**2-x1-x2
         # y3=s*(x1-x3)-y1
         if self.x != other.x:
-            s = (other.y - self.y)/(other.x - self.x)
-            x_3 = s**2 - self.x - other.x
-            y_3 = s*(self.x - x_3) - self.y
-            return self.__class__(x_3, y_3, self.a, self.b)
+            s = (other.y - self.y) / (other.x - self.x)
+            x = s**2 - self.x - other.x
+            y = s * (self.x - x) - self.y
+            return self.__class__(x, y, self.a, self.b)
+
+        # Case 4: if we are tangent to the vertical line,
+        # we return the point at infinity
+        # note instead of figuring out what 0 is for each type
+        # we just use 0 * self.x
+        if self == other and self.y == 0 * self.x:
+            return self.__class__(None, None, self.a, self.b)
 
         # Case 3: self == other
         # Formula (x3,y3)=(x1,y1)+(x1,y1)
@@ -114,12 +131,95 @@ class Point:
         # x3=s**2-2*x1
         # y3=s*(x1-x3)-y1
         if self == other:
-            s = (3 * (self.x**2) + self.a)/( 2 * self.y)
-            x_3 = s**2 - (2 * self.x)
-            y_3 = s*(self.x - x_3) - self.y
-            return self.__class__(x_3, y_3, self.a, self.b)
+            s = (3 * self.x**2 + self.a) / (2 * self.y)
+            x = s**2 - 2 * self.x
+            y = s * (self.x - x) - self.y
+            return self.__class__(x, y, self.a, self.b)
+    
+    # Scalar Multiplication
+    def __rmul__(self, coefficient):
+        coef = coefficient
+        current = self 
+        result = self.__class__(None, None, self.a, self.b) 
+        while coef:
+            if coef & 1:
+                result += current
+            current += current
+            coef >>= 1
+        return result
 
-        # Case where tangent is vetical
-        # y coordinates = 0 
-        if self == other and self.y == 0 * self.x:
-            return self.__class__(None, None, self.a, self.b)
+
+
+
+# parameters for secp256k1
+# a = 0 , b = 7, y**2 = x**3 + 7
+
+P = 2**256 - 2**32 - 977
+
+class S256Field(FieldElement):
+
+    def __init__(self, num, prime=None):
+        super().__init__(num, prime=P)
+    
+    def __repr__(self):
+        return '{:x}'.format(self.num).zfill(64)
+
+
+A = 0
+B = 7
+
+Gx = 0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
+Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8
+N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
+
+class S256Point(Point):
+
+    def __init__(self, x, y, a=None, b=None):
+        a, b = S256Field(A), S256Field(B)
+        if type(x) == int:
+            super().__init__(x=S256Field(x), y=S256Field(y), a=a, b=b)
+        else:
+            super().__init__(x, y, a, b)
+        
+    def __rmul__(self, coefficient):
+        coef = coefficient % N
+        return super().__rmul__(coef)
+
+    def verify(self, z, sig):
+        s_inv = pow(sig.s, N-2, N)
+        u = z * s_inv % N
+        v = sig.r * s_inv % N
+        R = u * G + v * self
+        return R.x.num == sig.r
+
+
+G = S256Point(Gx, Gy)
+
+class Signature:
+
+    def __init__(self, r, s):
+        self.r = r
+        self.s = s
+    
+    def __repr__(self):
+        return 'Signature({:x},{:x})'.format(self.r, self.s)
+
+
+class PrivateKey:
+
+    def __init__(self, secret):
+        self.secret = secret
+        self.point = secret * G
+    
+    def hex(self):
+        return '{:x}'.format(self.secret).zfill(64)
+
+    def sign(self, z):
+        k = randint(0, N)
+        r = (k * G).x.num
+        k_inv = pow(k, N-2, N)
+        s = (z + r * self.secret) * k_inv % N
+
+        if s > N/2:
+            s = N - s
+        return Signature(r,s)    
