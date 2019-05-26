@@ -1,6 +1,7 @@
 from ecc import FieldElement, Point, S256Point, G, N, PrivateKey
 from Crypto.Hash import SHA256
 from random import randint
+from helper import encode_base58
 
 a = FieldElement(3, 31)
 b = FieldElement(24, 31)
@@ -92,3 +93,22 @@ v = signature.r * s_inv % N
 R = u*G + v*p_key.point
 print(R.x.num)
 print(R.x.num == signature.r) # check if the x coordinate is r
+
+
+# Convert Binary to Base58
+address = bytes.fromhex('7c076ff316692a3d7eb3c3bb0f8b1488cf72e1afcd929e29307032997a838a3d')
+print('BASE 58 ADDRESS')
+print(encode_base58(address))
+
+
+# get Public Key address from secret (private key)
+secret = 0x12345deadbeef
+public_key = PrivateKey(secret).point.address()
+print('Public Key of 0x12345deadbeef')
+print(public_key)
+
+# get WIF Format from a secret (private key)
+secret = 0x12345deadbeef
+wif_of_secret = PrivateKey(secret).wif()
+print('WIF Format of 0x12345deadbeef')
+print(wif_of_secret)

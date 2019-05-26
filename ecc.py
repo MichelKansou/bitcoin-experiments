@@ -1,5 +1,6 @@
 from random import randint
 from Crypto.Hash import SHA256
+from helper import hash160, encode_base58_checksum
 import hmac
 
 class FieldElement:
@@ -166,6 +167,9 @@ class S256Field(FieldElement):
     def __repr__(self):
         return '{:x}'.format(self.num).zfill(64)
 
+    def sqrt(self):
+        return self**((P + 1) // 4)
+
 
 A = 0
 B = 7
@@ -194,6 +198,52 @@ class S256Point(Point):
         R = u * G + v * self
         return R.x.num == sig.r
 
+    def sec(self, compressed=True):
+        # returns the binary version of the SEC format (Standard for Efficient Cryptography)
+        if compressed:
+            if self.y.num % 2 == 0:
+                return b'\x02' + self.x.num.to_bytes(32, 'big')
+            else:
+                return b'\x03' + self.x.num.to_bytes(32, 'big')
+        else:
+            return b'\x04' + self.x.num.to_bytes(32, 'big') + self.y.num.to_bytes(32, 'big')
+
+    def hash160(self, compressed=True):
+        return hash160(self.sec(compressed))
+
+    def address(self, compressed=True, testnet=False):
+        # Return the address string
+        h160 = self.hash160(compressed)
+        if testnet:
+            prefix = b'\x6f'
+        else:
+            prefix = b'\x00'
+        return encode_base58_checksum(prefix + h160)
+
+    @classmethod
+    def parse(self, sec_bin):
+        # returns a Point object from a SEC binary (not hex)
+        if sec_bin[0] == 4:
+            x = int.from_bytes(sec_bin[1:33], 'big')
+            y = int.from_bytes(sec_bin[33:65], 'big')
+            return S256Point(x=x, y=y)
+        is_even = sec_bin[0] == 2
+        x = S256Field(int.from_bytes(sec_bin[1:], 'big'))
+        # right side of the equation y^2 = x^3 + 7
+        alpha = x**3 + S256Field(B)
+        # solve for left side
+        beta = alpha.sqrt()
+        if beta.num % 2 == 0:
+            even_beta = beta
+            odd_beta = S256Field(P - beta.num)
+        else:
+            even_beta = S256Field(P - beta.num)
+            odd_beta = beta
+        if is_even:
+            return S256Point(x, even_beta)
+        else:
+            return S256Point(x, odd_beta)
+
 
 G = S256Point(Gx, Gy)
 
@@ -205,6 +255,23 @@ class Signature:
     
     def __repr__(self):
         return 'Signature({:x},{:x})'.format(self.r, self.s)
+    
+    def der(self):
+        rbin = self.r.to_bytes(32, 'big')
+        # remove all null bytes at the beginning
+        rbin = rbin.lstrip(b'\x00')
+        # if rbin has a high bit, add a \x00
+        if rbin[0] & 0x80:
+            rbin = b'\x00' + rbin
+        result = bytes([2, len(rbin)]) + rbin
+        sbin = self.s.to_bytes(32, 'big')
+        # remove all null bytes at the beginning
+        sbin = sbin.lstrip(b'\x00')
+        # if sbin has a high bit, add a \x00
+        if sbin[0] & 0x80:
+            sbin = b'\x00' + sbin
+        result += bytes([2, len(sbin)]) + sbin
+        return bytes([0x30, len(result)]) + result
 
 
 class PrivateKey:
@@ -225,6 +292,26 @@ class PrivateKey:
         if s > N/2:
             s = N - s
         return Signature(r,s)
+
+    # WIF Format is a serialization of the private key that's meant to be human readable private key.
+    def wif(self, compressed=True, testnet=False):
+        # 1 Encode the secret in 32 bytes big-endian
+        secret_bytes = self.secret.to_bytes(32, 'big')
+
+        # 2 For mainnet private keys start prefix with 0x80 and testnet with 0xef
+        if testnet:
+            prefix = b'\xef'
+        else:
+            prefix = b'\x80'
+        # 3 if SEC format used for public key is compressed add a suffix of 0x01
+        if compressed:
+            suffix = b'\x01'
+        else:
+            suffix = b''
+        # 4 Combine prefix + secret_bytes + suffix
+        # 5 Do hash256 (double sha256) of secret_combination
+        # 6 Take result combination and the first 4 bytes of hash256 and encoded it in Base58 
+        return encode_base58_checksum(prefix + secret_bytes + suffix)
 
     # source https://tools.ietf.org/html/rfc6979#appendix-A.1.2
     # RFC 6979 specification for deterministic k value generation
