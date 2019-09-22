@@ -1,7 +1,6 @@
-from ecc import FieldElement, Point, S256Point, G, N, PrivateKey
+from bitcoin_protocol.ecc import FieldElement, Point, S256Point, G, N, PrivateKey
+from bitcoin_protocol.helper import encode_base58
 from Crypto.Hash import SHA256
-from random import randint
-from helper import encode_base58
 
 a = FieldElement(3, 31)
 b = FieldElement(24, 31)
@@ -59,8 +58,8 @@ p = Point(x, y, a, b)
 print(7*p)
 
 
-# Check order of G 
-print(N*G) #Point at infinity
+# Check order of G
+print(N*G)  # Point at infinity
 
 # Verifying Signature
 z = 0xbc62d4b80d9e36da29c16c5d4d9f11731f36052c72401a76c23c0fb5a9b74423
@@ -74,8 +73,7 @@ u = z * s_inv % N
 v = r * s_inv % N
 R = u*G + v*point
 print(R.x.num)
-print(R.x.num == r) # check if the x coordinate is r
-
+print(R.x.num == r)  # check if the x coordinate is r
 
 
 # Signing Message and Verify Signature
@@ -92,11 +90,12 @@ u = z * s_inv % N
 v = signature.r * s_inv % N
 R = u*G + v*p_key.point
 print(R.x.num)
-print(R.x.num == signature.r) # check if the x coordinate is r
+print(R.x.num == signature.r)  # check if the x coordinate is r
 
 
 # Convert Binary to Base58
-address = bytes.fromhex('7c076ff316692a3d7eb3c3bb0f8b1488cf72e1afcd929e29307032997a838a3d')
+address = bytes.fromhex(
+    '7c076ff316692a3d7eb3c3bb0f8b1488cf72e1afcd929e29307032997a838a3d')
 print('BASE 58 ADDRESS')
 print(encode_base58(address))
 

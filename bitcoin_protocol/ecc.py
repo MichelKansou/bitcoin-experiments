@@ -1,10 +1,10 @@
-from random import randint
 from Crypto.Hash import SHA256
 from helper import hash160, encode_base58_checksum
 import hmac
 
+
 class FieldElement:
-    
+
     def __init__(self, num, prime):
         if num >= prime or num < 0:
             error = 'Num {} not in field range 0 to {}'.format(num, prime - 1)
@@ -36,13 +36,13 @@ class FieldElement:
             raise TypeError('Cannot sub two numbers in different fields')
         num = (self.num - other.num) % self.prime
         return self.__class__(num, self.prime)
-    
+
     def __mul__(self, other):
         if self.prime != other.prime:
             raise TypeError('Cannot multiply two numbers in different Fields')
         num = (self.num * other.num) % self.prime
         return self.__class__(num, self.prime)
-    
+
     def __pow__(self, exponent):
         #n = exponent
         #while n < 0:
@@ -50,13 +50,13 @@ class FieldElement:
         n = exponent % (self.prime - 1)
         num = pow(self.num, n, self.prime)
         return self.__class__(num, self.prime)
-    
+
     def __truediv__(self, other):
         if self.prime != other.prime:
             raise TypeError('Cannot divide two numbers in different Fields')
         # use fermat's little theorem:
         # self.num**(p-1) % p == 1
-                # this means:
+            # this means:
         # 1/n == pow(n, p-2, p)
         # We return an element of the same class
         other_result = pow(other.num, self.prime-2, self.prime)
@@ -66,6 +66,7 @@ class FieldElement:
     def __rmul__(self, coefficient):
         num = (self.num * coefficient) % self.prime
         return self.__class__(num=num, prime=self.prime)
+
 
 class Point:
 
@@ -78,10 +79,10 @@ class Point:
             return
         if self.y**2 != self.x**3 + a * x + b:
             raise ValueError('({}, {}) is not on the curve'.format(x, y))
-    
+
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y and self.a == other.a and self.b == other.b
-    
+
     def __ne__(self, other):
         # this should be the inverse of the == operator
         return not (self == other)
@@ -97,7 +98,8 @@ class Point:
 
     def __add__(self, other):
         if self.a != other.a or self.b != other.b:
-            raise TypeError('Points {}, {} are not on the same curve'.format(self, other))
+            raise TypeError(
+                'Points {}, {} are not on the same curve'.format(self, other))
         # Case 0.0: self is the point at infinity, return other
         if self.x is None:
             return other
@@ -138,12 +140,12 @@ class Point:
             x = s**2 - 2 * self.x
             y = s * (self.x - x) - self.y
             return self.__class__(x, y, self.a, self.b)
-    
+
     # Scalar Multiplication
     def __rmul__(self, coefficient):
         coef = coefficient
-        current = self 
-        result = self.__class__(None, None, self.a, self.b) 
+        current = self
+        result = self.__class__(None, None, self.a, self.b)
         while coef:
             if coef & 1:
                 result += current
@@ -152,18 +154,16 @@ class Point:
         return result
 
 
-
-
 # parameters for secp256k1
 # a = 0 , b = 7, y**2 = x**3 + 7
-
 P = 2**256 - 2**32 - 977
+
 
 class S256Field(FieldElement):
 
     def __init__(self, num, prime=None):
         super().__init__(num, prime=P)
-    
+
     def __repr__(self):
         return '{:x}'.format(self.num).zfill(64)
 
@@ -178,6 +178,7 @@ Gx = 0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798
 Gy = 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8
 N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
 
+
 class S256Point(Point):
 
     def __init__(self, x, y, a=None, b=None):
@@ -186,7 +187,7 @@ class S256Point(Point):
             super().__init__(x=S256Field(x), y=S256Field(y), a=a, b=b)
         else:
             super().__init__(x, y, a, b)
-        
+
     def __rmul__(self, coefficient):
         coef = coefficient % N
         return super().__rmul__(coef)
@@ -247,15 +248,16 @@ class S256Point(Point):
 
 G = S256Point(Gx, Gy)
 
+
 class Signature:
 
     def __init__(self, r, s):
         self.r = r
         self.s = s
-    
+
     def __repr__(self):
         return 'Signature({:x},{:x})'.format(self.r, self.s)
-    
+
     def der(self):
         rbin = self.r.to_bytes(32, 'big')
         # remove all null bytes at the beginning
@@ -279,7 +281,7 @@ class PrivateKey:
     def __init__(self, secret):
         self.secret = secret
         self.point = secret * G
-    
+
     def hex(self):
         return '{:x}'.format(self.secret).zfill(64)
 
@@ -291,7 +293,7 @@ class PrivateKey:
 
         if s > N/2:
             s = N - s
-        return Signature(r,s)
+        return Signature(r, s)
 
     # WIF Format is a serialization of the private key that's meant to be human readable private key.
     def wif(self, compressed=True, testnet=False):
@@ -310,7 +312,7 @@ class PrivateKey:
             suffix = b''
         # 4 Combine prefix + secret_bytes + suffix
         # 5 Do hash256 (double sha256) of secret_combination
-        # 6 Take result combination and the first 4 bytes of hash256 and encoded it in Base58 
+        # 6 Take result combination and the first 4 bytes of hash256 and encoded it in Base58
         return encode_base58_checksum(prefix + secret_bytes + suffix)
 
     # source https://tools.ietf.org/html/rfc6979#appendix-A.1.2

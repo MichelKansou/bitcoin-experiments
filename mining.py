@@ -3,15 +3,15 @@ import time
 
 text = "I am Satoshi Nakamoto"
 
-max_nonce = 2 ** 32 # 4 billion
+max_nonce = 2 ** 32  # 4 billion
 
 nonce = 0
 hash_result = ''
-difficulty_bits = 25 # for 25 nonce 39991487
+difficulty_bits = 25  # for 25 nonce 39991487
 target = 2 ** (256 - difficulty_bits)
 
 
-# iterate nonce until hash is valid 
+# iterate nonce until hash is valid
 def proof_of_work(header):
     print("Target ", target)
     # checkpoint the current time
@@ -25,7 +25,7 @@ def proof_of_work(header):
         if int(hash_result, 16) < target:
             print("Success with nonce %d" % nonce)
             print("Hash is %s" % hash_result)
-            
+
             # checkpoint how long it took to find a result
             end_time = time.time()
 
