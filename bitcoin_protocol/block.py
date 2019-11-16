@@ -1,6 +1,7 @@
 from bitcoin_protocol.helper import (
     bits_to_target,
     hash256,
+    merkle_root,
     int_to_little_endian,
     little_endian_to_int,
 )
@@ -116,3 +117,14 @@ class Block:
         proof = little_endian_to_int(block_hash)
         # return whether this integer is less than the target
         return proof < self.target()
+
+    def validate_merkle_root(self):
+        """Gets the merkle root of the tx_hashes and checks that it's
+        the same as the merkle root of this block.
+        """
+        # reverse each item in self.tx_hashes
+        reversed_tx_hashes = [h[::-1] for h in self.tx_hashes]
+        # compute the Merkle Root and reverse
+        checked_merkle_root = merkle_root(reversed_tx_hashes)[::-1]
+        # return whether self.merkle_root is the same
+        return self.merkle_root == checked_merkle_root
